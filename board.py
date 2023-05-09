@@ -17,8 +17,9 @@ class Board:
 
         self.cell_dimensions = (self.dimensions[0] // 3, self.dimensions[1] // 3)
         self.cells = self.create_cells()
-
+        
         self.current_turn = random_choice(("O", "X")) # Player can be "O" or "X" 
+        self.cells_remaining = 9 # Used in the event of a tie
         
         # print([(cell.rect.x, cell.rect.y) for cell in self.cells])
 
@@ -51,10 +52,23 @@ class Board:
                     # Set this cell to either "X" or "O"
                     self.cells[cell_collided].nature = self.current_turn
 
-                    # ADD METHOD TO CHECK WINNER HERE
+                    # Remove one cell 
+                    self.cells_remaining -= 1
+                    
+                    # Check if anyone won
+                    won = self.check_winner()
+                    if won:
+                        self.current_turn = None
+                    # Tie
+                    elif won == False and self.cells_remaining == 0:
+                        self.current_turn = None
+                        print("TIED")
 
-                    # Switch turn
-                    self.current_turn = "X" if self.current_turn == "O" else "O"
+                    else:
+                        # Switch turn
+                        self.current_turn = "X" if self.current_turn == "O" else "O"
+
+                print(cell_collided)
 
         # Released left mouse click
         else:
@@ -85,9 +99,30 @@ class Board:
 
         for cell in self.cells:
             cell.draw()
+    
+    def check_winner(self):
         
-    def run(self):
+        # Horizontal (Rows)
+        for i in range(3):
+            if self.cells[i].nature != None and self.cells[i].nature == self.cells[i + 3].nature == self.cells[i + 6].nature:
+                return True
+        
+        # Vertical (Columns)
+        for i in range(0, 7, 3):
+            if self.cells[i].nature != None and self.cells[i].nature == self.cells[i + 1].nature == self.cells[i + 2].nature:
+                return True
+                
+        # Diagonals
+        if self.cells[4].nature != None and (
+            (self.cells[0].nature == self.cells[4].nature == self.cells[8].nature) or (self.cells[6].nature == self.cells[4].nature == self.cells[2].nature)):
+            return True
+        
+        return False
 
+    def run(self):
+        
         self.draw_grid()
         self.draw_cells()
-        self.handle_cell_collisions()
+
+        if self.current_turn != None:
+            self.handle_cell_collisions()
