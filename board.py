@@ -5,6 +5,8 @@ from pygame.display import get_surface as pygame_display_get_surface
 from pygame.mouse import get_pos as pygame_mouse_get_pos
 from pygame.mouse import get_pressed as pygame_mouse_get_pressed
 from pygame import Rect as pygame_Rect
+from pygame.font import SysFont as pygame_font_SysFont
+from pygame.time import get_ticks as pygame_time_get_ticks
 
 from random import choice as random_choice
 
@@ -20,6 +22,9 @@ class Board:
         
         self.current_turn = random_choice(("O", "X")) # Player can be "O" or "X" 
         self.cells_remaining = 9 # Used in the event of a tie
+
+        self.text_font = pygame_font_SysFont("Bahnschrift", 75)
+        self.reset_timer = 0
         
         # print([(cell.rect.x, cell.rect.y) for cell in self.cells])
 
@@ -54,21 +59,22 @@ class Board:
 
                     # Remove one cell 
                     self.cells_remaining -= 1
-                    
+
                     # Check if anyone won
                     won = self.check_winner()
                     if won:
-                        self.current_turn = None
+                        self.current_turn += "#" # Add a temp character to show that the "X" or "O" has won
+                        self.reset_timer = pygame_time_get_ticks() # Start the reset timer
+                    
                     # Tie
                     elif won == False and self.cells_remaining == 0:
                         self.current_turn = None
-                        print("TIED")
+                        self.reset_timer = pygame_time_get_ticks() # Start the reset timer
 
                     else:
                         # Switch turn
                         self.current_turn = "X" if self.current_turn == "O" else "O"
 
-                print(cell_collided)
 
         # Released left mouse click
         else:
@@ -100,6 +106,13 @@ class Board:
         for cell in self.cells:
             cell.draw()
     
+    def draw_text(self, text, text_colour, font, x, y):
+        
+        # Render the text as an image without anti-aliasing
+        text_image = font.render(text, False, text_colour)
+        # Blit the image onto the surface
+        self.surface.blit(text_image, (x, y))
+
     def check_winner(self):
         
         # Horizontal (Rows)
@@ -119,10 +132,41 @@ class Board:
         
         return False
 
+    def reset_board(self):
+        
+        self.current_turn = random_choice(("O", "X")) 
+        self.cells_remaining = 9 
+        self.reset_timer = 0
+
+        # Reset all cells' nature
+        for cell in self.cells:
+            cell.nature = None
+
     def run(self):
+        
         
         self.draw_grid()
         self.draw_cells()
 
-        if self.current_turn != None:
+        # Neither side has won
+        if self.current_turn == "X" or self.current_turn == "O":
             self.handle_cell_collisions()
+
+        # Stalemate / Tie or a side has won
+        else:
+
+            # 1.5 seconds display time
+            if pygame_time_get_ticks() - self.reset_timer <= 1500:
+
+                winner_text = "Tie!" if self.current_turn == None else f"{self.current_turn[:-1]} has won!" 
+                text_size = self.text_font.size(winner_text)
+                self.draw_text(
+                                text = winner_text,
+                                text_colour = "GREEN",
+                                font = self.text_font,
+                                x = (self.surface.get_width() // 2) - (text_size[0] // 2),
+                                y = (self.surface.get_height() // 2) - (text_size[1] // 2)
+                                )
+                
+            else:
+                self.reset_board()
