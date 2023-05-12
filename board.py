@@ -20,14 +20,14 @@ class Board:
         self.cell_dimensions = (self.dimensions[0] // 3, self.dimensions[1] // 3)
         self.cells = self.create_cells()
         
-        self.current_turn = random_choice(("O", "X")) # Player can be "O" or "X" 
+        self.current_turn = random_choice(("O", "X"))
+        self.ai_side = random_choice(("O", "X"))
+
         self.cells_remaining = 9 # Used in the event of a tie
 
         self.text_font = pygame_font_SysFont("Bahnschrift", 75)
         self.reset_timer = 0
         
-        # print([(cell.rect.x, cell.rect.y) for cell in self.cells])
-
     def create_cells(self):
 
         # Returns a list of all the cells created for the game
@@ -62,16 +62,19 @@ class Board:
 
                     # Check if anyone won
                     won = self.check_winner()
-                    if won:
+                    
+                    # AI / Player won
+                    if won == "X" or won == "O":
                         self.current_turn += "#" # Add a temp character to show that the "X" or "O" has won
                         self.reset_timer = pygame_time_get_ticks() # Start the reset timer
                     
                     # Tie
-                    elif won == False and self.cells_remaining == 0:
+                    elif won == "Tie":
                         self.current_turn = None
                         self.reset_timer = pygame_time_get_ticks() # Start the reset timer
 
-                    else:
+                    # No winners
+                    elif won == None:
                         # Switch turn
                         self.current_turn = "X" if self.current_turn == "O" else "O"
 
@@ -118,39 +121,167 @@ class Board:
         # Horizontal (Rows)
         for i in range(3):
             if self.cells[i].nature != None and self.cells[i].nature == self.cells[i + 3].nature == self.cells[i + 6].nature:
-                return True
+                return self.cells[i].nature
         
         # Vertical (Columns)
         for i in range(0, 7, 3):
             if self.cells[i].nature != None and self.cells[i].nature == self.cells[i + 1].nature == self.cells[i + 2].nature:
-                return True
+                return self.cells[i].nature
                 
         # Diagonals
         if self.cells[4].nature != None and (
             (self.cells[0].nature == self.cells[4].nature == self.cells[8].nature) or (self.cells[6].nature == self.cells[4].nature == self.cells[2].nature)):
-            return True
+            return self.cells[4].nature
         
-        return False
+        # Returns "Tie" if the entire board is filled (there are no available cells)
+        return "Tie" if self.cells_remaining == 0 else None
 
     def reset_board(self):
         
-        self.current_turn = random_choice(("O", "X")) 
+        # The loser should now have the first turn if someone won, else choose randomly
+        if self.current_turn == "O#":
+            self.current_turn = "X" 
+        elif self.current_turn == "X#":
+            self.current_turn = "O"
+        else:
+            self.current_turn = random_choice(("O", "X"))
+
         self.cells_remaining = 9 
         self.reset_timer = 0
 
         # Reset all cells' nature
         for cell in self.cells:
             cell.nature = None
+    
+    def pick_best_move(self):
+
+        # AI is the maximising side
+        if self.ai_side == "X":
+            best_score = -float("inf")
+
+            for i in range(len(self.cells)):
+                
+                if self.cells[i].nature == None: # Available
+                    
+                    # Apply board changes
+                    self.cells[i].nature = "X" # if is_maximising else "O"
+                    self.cells_remaining -= 1
+
+                    score = self.minimax(False)
+
+                    if score > best_score:
+                        best_score = score
+                        best_move = i
+
+                    # Remove board changes
+                    self.cells[i].nature = None
+                    self.cells_remaining += 1
+
+        else:
+            best_score = float("inf")
+            
+            for i in range(len(self.cells)):
+            
+                if self.cells[i].nature == None: # Available
+                    
+                    # Apply board changes
+                    self.cells[i].nature = "O"
+                    self.cells_remaining -= 1
+
+                    score = self.minimax(True)
+
+                    if score < best_score:
+                        best_score = score
+                        best_move = i
+
+                    # Remove board changes
+                    self.cells[i].nature = None
+                    self.cells_remaining += 1
+    
+        # Apply the best move
+        self.cells[best_move].nature = self.ai_side
+        self.cells_remaining -= 1
+
+        # Check if there was a tie or if the AI won
+        result = self.check_winner()
+            
+        if result == "O" or result == "X":
+            self.current_turn += "#"
+            self.reset_timer = pygame_time_get_ticks()
+
+        elif result == "Tie":
+            self.current_turn = None
+            self.reset_timer = pygame_time_get_ticks()
+
+        # No winners
+        else:
+            # Switch turn
+            self.current_turn = "X" if self.current_turn == "O" else "O"
+    
+    def minimax(self, is_maximising):
+
+        # Check for a winner / a stalemate
+        result = self.check_winner()
+
+        # AI / Player won or a stalemate
+        if result != None:
+            
+            if result == "Tie":
+                return 0
+            
+            # "X": return 1 "O": return -1
+            else:
+                return -1 if result == "O" else 1
+        
+        # "X" = Maximising
+        if is_maximising:
+            best_score = -float("inf")
+            for i in range(9):
+                
+                if self.cells[i].nature == None: # Available
+                    
+                    self.cells_remaining -= 1
+                    self.cells[i].nature = "X"
+
+                    # Set best score as the maximum between the score of picking this cell or the current best score
+                    best_score = max(best_score, self.minimax(False))
+                    
+                    self.cells[i].nature = None
+                    self.cells_remaining += 1
+        
+        # "O" = Minimising
+        else:
+            best_score = float("inf")
+            for i in range(9):
+                
+                if self.cells[i].nature == None: # Available
+                    
+                    self.cells_remaining -= 1
+                    self.cells[i].nature = "O"
+
+                    # Set best score as the minimum between the score of picking this cell or the current best score
+                    best_score = min(best_score, self.minimax(True))
+
+                    self.cells[i].nature = None
+                    self.cells_remaining += 1
+        
+        return best_score
 
     def run(self):
-        
         
         self.draw_grid()
         self.draw_cells()
 
-        # Neither side has won
-        if self.current_turn == "X" or self.current_turn == "O":
-            self.handle_cell_collisions()
+        # Still playing and the player's turn
+        if (self.current_turn == "X" or self.current_turn == "O"):
+            
+            # Player's turn
+            if self.current_turn != self.ai_side:
+                self.handle_cell_collisions()
+
+            # AI's turn
+            else:
+                self.pick_best_move()
 
         # Stalemate / Tie or a side has won
         else:
