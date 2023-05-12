@@ -167,7 +167,7 @@ class Board:
                     self.cells[i].nature = "X" # if is_maximising else "O"
                     self.cells_remaining -= 1
 
-                    score = self.minimax(False)
+                    score = self.minimax(False, alpha = -float("inf"), beta = float("inf"))
 
                     if score > best_score:
                         best_score = score
@@ -188,8 +188,12 @@ class Board:
                     self.cells[i].nature = "O"
                     self.cells_remaining -= 1
 
-                    score = self.minimax(True)
-
+                    score = self.minimax(
+                                        is_maximising = True, 
+                                        alpha = -float("inf"), # Worst possible option for maximising
+                                        beta = float("inf") # Worst possible option for minimising
+                                        ) 
+                    
                     if score < best_score:
                         best_score = score
                         best_move = i
@@ -218,7 +222,7 @@ class Board:
             # Switch turn
             self.current_turn = "X" if self.current_turn == "O" else "O"
     
-    def minimax(self, is_maximising):
+    def minimax(self, is_maximising, alpha, beta):
 
         # Check for a winner / a stalemate
         result = self.check_winner()
@@ -244,10 +248,16 @@ class Board:
                     self.cells[i].nature = "X"
 
                     # Set best score as the maximum between the score of picking this cell or the current best score
-                    best_score = max(best_score, self.minimax(False))
-                    
+                    score = self.minimax(False, alpha, beta)
+                    best_score = max(best_score, score)
+
                     self.cells[i].nature = None
                     self.cells_remaining += 1
+
+                    # If beta <= alpha it means that there is a larger maximising value already found, so there is no point searching anymore as "X" will not go down this path
+                    alpha = max(alpha, score)
+                    if beta <= alpha:
+                        break
         
         # "O" = Minimising
         else:
@@ -260,10 +270,16 @@ class Board:
                     self.cells[i].nature = "O"
 
                     # Set best score as the minimum between the score of picking this cell or the current best score
-                    best_score = min(best_score, self.minimax(True))
+                    score = self.minimax(True, alpha, beta)
+                    best_score = min(best_score, score)
 
                     self.cells[i].nature = None
                     self.cells_remaining += 1
+
+                    # If beta <= alpha it means that there is a smaller value already found, so there is no point searching anymore as "O" will not go down this path
+                    beta = min(beta, score)
+                    if beta <= alpha:
+                        break
         
         return best_score
 
